@@ -15,7 +15,7 @@ for version in "${object_versions[@]}"; do
     helm install $object-standalone-$version_suffix --namespace $object --create-namespace -f ./values/$value_file ./$object \
     --set image.tag=$version \
     --set commonLabels.object_version=$version_suffix \
-    --set service.nodePorts=$port
+    --set service.nodePorts.http=$port
     ((port++))
 
     sleep 1
