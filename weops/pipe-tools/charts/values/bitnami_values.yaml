@@ -1,0 +1,13 @@
+commonLabels:
+  object: nginx
+
+nodeSelector:
+    node-role: worker
+
+service:
+  type: NodePort
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 200Mi
