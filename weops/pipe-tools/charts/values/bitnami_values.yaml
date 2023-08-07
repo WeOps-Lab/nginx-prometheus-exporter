@@ -4,8 +4,14 @@ commonLabels:
 nodeSelector:
     node-role: worker
 
-containerSecurityContext:
-  runAsNonRoot: false
+serverBlock: |-
+  server {
+    listen 0.0.0.0:8080;
+    location /stub_status {
+      stub_status on;
+      access_log   off;
+    }
+  }
 
 service:
   type: NodePort
