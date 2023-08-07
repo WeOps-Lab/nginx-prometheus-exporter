@@ -125,7 +125,6 @@ func main() {
 	for i, arg := range os.Args {
 		if strings.HasPrefix(arg, "-") && len(arg) > 1 {
 			newArg := fmt.Sprintf("-%s", arg)
-			level.Warn(logger).Log("msg", "the flag format is deprecated and will be removed in a future release, please use the new format", "old", arg, "new", newArg)
 			os.Args[i] = newArg
 		}
 	}
