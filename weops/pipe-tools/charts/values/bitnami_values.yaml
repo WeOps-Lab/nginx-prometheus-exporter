@@ -4,6 +4,9 @@ commonLabels:
 nodeSelector:
     node-role: worker
 
+containerSecurityContext:
+  runAsNonRoot: false
+
 service:
   type: NodePort
 
