@@ -66,7 +66,7 @@ spec:
           - -nginx.retry-interval=3s
         env:
         - name: NGINX_SCRAPE_URI
-          value: "http://nginx-{{MODULE}}-{{VERSION}}.nginx:80/{{MODULE}}_status/format/json"
+          value: "http://nginx-{{VERSION}}.nginx:80/{{MODULE}}_status/format/json"
         resources:
           requests:
             cpu: 100m
