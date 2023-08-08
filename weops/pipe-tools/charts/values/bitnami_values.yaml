@@ -10,14 +10,14 @@ serverBlock: |-
   }
 
   vhost_traffic_status_zone;
+  vhost_traffic_status_filter_by_host on;
+  vhost_traffic_status_filter_by_set_key $status $server_name;
 
   server {
-    server_name weops.org;
+    server_name *.weops.org;
 
     listen 8080;
     include  "/opt/bitnami/nginx/conf/bitnami/*.conf";
-
-    vhost_traffic_status_filter_by_set_key $geoip_country_code country::$server_name;
 
     location /vts_status {
       vhost_traffic_status_display;
