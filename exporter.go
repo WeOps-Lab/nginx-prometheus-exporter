@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"net"
 	"net/http"
 	"os"
@@ -101,12 +102,14 @@ var (
 	webConfig     = kingpinflag.AddFlags(kingpin.CommandLine, ":9113")
 	metricsPath   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").Envar("TELEMETRY_PATH").String()
 	nginxPlus     = kingpin.Flag("nginx.plus", "Start the exporter for NGINX Plus. By default, the exporter is started for NGINX.").Default("false").Envar("NGINX_PLUS").Bool()
+	nginxVts      = kingpin.Flag("nginx.vts", "Start the exporter for NGINX VTS. By default, the exporter is started for NGINX.").Default("false").Envar("NGINX_VTS").Bool()
 	scrapeURI     = kingpin.Flag("nginx.scrape-uri", "A URI or unix domain socket path for scraping NGINX or NGINX Plus metrics. For NGINX, the stub_status page must be available through the URI. For NGINX Plus -- the API.").Default("http://127.0.0.1:8080/stub_status").Envar("NGINX_SCRAPE_URI").String()
 	sslVerify     = kingpin.Flag("nginx.ssl-verify", "Perform SSL certificate verification.").Default("false").Envar("SSL_VERIFY").Bool()
 	sslCaCert     = kingpin.Flag("nginx.ssl-ca-cert", "Path to the PEM encoded CA certificate file used to validate the servers SSL certificate.").Default("").Envar("SSL_CA_CERT").String()
 	sslClientCert = kingpin.Flag("nginx.ssl-client-cert", "Path to the PEM encoded client certificate file to use when connecting to the server.").Default("").Envar("SSL_CLIENT_CERT").String()
 	sslClientKey  = kingpin.Flag("nginx.ssl-client-key", "Path to the PEM encoded client certificate key file to use when connecting to the server.").Default("").Envar("SSL_CLIENT_KEY").String()
 	nginxRetries  = kingpin.Flag("nginx.retries", "A number of retries the exporter will make on start to connect to the NGINX stub_status page/NGINX Plus API before exiting with an error.").Default("0").Envar("NGINX_RETRIES").Uint()
+	vtsInsecure   = kingpin.Flag("insecure", "Ignore server certificate if using https").Default("true").Bool()
 
 	// Custom command-line flags
 	timeout            = createPositiveDurationFlag(kingpin.Flag("nginx.timeout", "A timeout for scraping metrics from NGINX or NGINX Plus.").Default("5s").Envar("TIMEOUT"))
@@ -203,6 +206,9 @@ func main() {
 		}
 		variableLabelNames := collector.NewVariableLabelNames(nil, nil, nil, nil, nil, nil)
 		prometheus.MustRegister(collector.NewNginxPlusCollector(plusClient.(*plusclient.NginxClient), "nginxplus", variableLabelNames, constLabels, logger))
+	} else if *nginxVts {
+		exporter := collector.VtsExporter{URI: *scrapeURI, NAMESPACE: "nginxvts", INSECURE: *vtsInsecure}
+		prometheus.MustRegister(exporter.NewVTSExporter(*scrapeURI, "nginxvts", *vtsInsecure))
 	} else {
 		ossClient, err := createClientWithRetries(func() (interface{}, error) {
 			return client.NewNginxClient(httpClient, *scrapeURI)
@@ -213,6 +219,13 @@ func main() {
 		}
 		prometheus.MustRegister(collector.NewNginxCollector(ossClient.(*client.NginxClient), "nginx", constLabels, logger))
 	}
+
+	prometheus.Unregister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts(prometheus.ProcessCollectorOpts{
+		PidFn: func() (int, error) {
+			return os.Getpid(), nil
+		},
+	})))
+	prometheus.Unregister(collectors.NewGoCollector())
 
 	http.Handle(*metricsPath, promhttp.Handler())
 
