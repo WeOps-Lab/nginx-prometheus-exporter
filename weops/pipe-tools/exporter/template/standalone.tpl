@@ -64,6 +64,7 @@ spec:
         args:
           - -nginx.timeout=3s
           - -nginx.retry-interval=3s
+          {{MODULE_PARAM}}
         env:
         - name: NGINX_SCRAPE_URI
           value: "http://nginx-{{VERSION}}.nginx:80/{{MODULE}}_status/format/json"
