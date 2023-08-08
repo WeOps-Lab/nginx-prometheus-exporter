@@ -1,14 +1,14 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: nginx-exporter-{{MODULE}}-{{VERSION}}
+  name: nginx-exporter-{{VERSION}}
   namespace: nginx
 spec:
-  serviceName: nginx-exporter-{{MODULE}}-{{VERSION}}
+  serviceName: nginx-exporter-{{VERSION}}
   replicas: 1
   selector:
     matchLabels:
-      app: nginx-exporter-{{MODULE}}-{{VERSION}}
+      app: nginx-exporter-{{VERSION}}
   template:
     metadata:
       annotations:
@@ -45,9 +45,8 @@ spec:
         telegraf.influxdata.com/limits-cpu: '300m'
         telegraf.influxdata.com/limits-memory: '300Mi'
       labels:
-        app: nginx-exporter-{{MODULE}}-{{VERSION}}
+        app: nginx-exporter-{{VERSION}}
         exporter_object: nginx
-        object_mode: {{MODULE}}
         object_version: {{VERSION}}
         pod_type: exporter
     spec:
@@ -55,7 +54,7 @@ spec:
         node-role: worker
       shareProcessNamespace: true
       containers:
-      - name: nginx-exporter-{{MODULE}}-{{VERSION}}
+      - name: nginx-exporter-{{VERSION}}
         image: registry-svc:25000/library/nginx-exporter:latest
         imagePullPolicy: Always
         securityContext:
@@ -64,10 +63,12 @@ spec:
         args:
           - -nginx.timeout=3s
           - -nginx.retry-interval=3s
-          {{MODULE_PARAM}}
+          - -nginx.vts
         env:
         - name: NGINX_SCRAPE_URI
-          value: "http://nginx-{{VERSION}}.nginx:80/{{MODULE}}_status/format/json"
+          value: "http://nginx-{{VERSION}}.nginx:80/stub_status"
+        - name: NGINX_VTS_SCRAPE_URI
+          value: "http://nginx-{{VERSION}}.nginx:80/vts_status/format/json"
         resources:
           requests:
             cpu: 100m
@@ -83,8 +84,8 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: nginx-exporter-{{MODULE}}-{{VERSION}}
-  name: nginx-exporter-{{MODULE}}-{{VERSION}}
+    app: nginx-exporter-{{VERSION}}
+  name: nginx-exporter-{{VERSION}}
   namespace: nginx
   annotations:
     prometheus.io/scrape: "true"
@@ -96,4 +97,4 @@ spec:
     protocol: TCP
     targetPort: 9113
   selector:
-    app: nginx-exporter-{{MODULE}}-{{VERSION}}
+    app: nginx-exporter-{{VERSION}}
