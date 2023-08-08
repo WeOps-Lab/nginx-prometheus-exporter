@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"github.com/nginxinc/nginx-prometheus-exporter/client"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"net"
 	"net/http"
@@ -16,7 +17,6 @@ import (
 	"time"
 
 	plusclient "github.com/nginxinc/nginx-plus-go-client/client"
-	"github.com/nginxinc/nginx-prometheus-exporter/client"
 	"github.com/nginxinc/nginx-prometheus-exporter/collector"
 
 	"github.com/alecthomas/kingpin/v2"
@@ -104,6 +104,7 @@ var (
 	nginxPlus     = kingpin.Flag("nginx.plus", "Start the exporter for NGINX Plus. By default, the exporter is started for NGINX.").Default("false").Envar("NGINX_PLUS").Bool()
 	nginxVts      = kingpin.Flag("nginx.vts", "Start the exporter for NGINX VTS. By default, the exporter is started for NGINX.").Default("false").Envar("NGINX_VTS").Bool()
 	scrapeURI     = kingpin.Flag("nginx.scrape-uri", "A URI or unix domain socket path for scraping NGINX or NGINX Plus metrics. For NGINX, the stub_status page must be available through the URI. For NGINX Plus -- the API.").Default("http://127.0.0.1:8080/stub_status").Envar("NGINX_SCRAPE_URI").String()
+	vtsScrapeURI  = kingpin.Flag("nginx.vts.scrape-uri", "A URI or unix domain socket path for scraping NGINX VTS metrics.").Default("http://127.0.0.1:8080/vts_status").Envar("NGINX_VTS_SCRAPE_URI").String()
 	sslVerify     = kingpin.Flag("nginx.ssl-verify", "Perform SSL certificate verification.").Default("false").Envar("SSL_VERIFY").Bool()
 	sslCaCert     = kingpin.Flag("nginx.ssl-ca-cert", "Path to the PEM encoded CA certificate file used to validate the servers SSL certificate.").Default("").Envar("SSL_CA_CERT").String()
 	sslClientCert = kingpin.Flag("nginx.ssl-client-cert", "Path to the PEM encoded client certificate file to use when connecting to the server.").Default("").Envar("SSL_CLIENT_CERT").String()
@@ -206,9 +207,6 @@ func main() {
 		}
 		variableLabelNames := collector.NewVariableLabelNames(nil, nil, nil, nil, nil, nil)
 		prometheus.MustRegister(collector.NewNginxPlusCollector(plusClient.(*plusclient.NginxClient), "nginxplus", variableLabelNames, constLabels, logger))
-	} else if *nginxVts {
-		exporter := collector.VtsExporter{URI: *scrapeURI, NAMESPACE: "nginxvts", INSECURE: *vtsInsecure}
-		prometheus.MustRegister(exporter.NewVTSExporter(*scrapeURI, "nginxvts", *vtsInsecure))
 	} else {
 		ossClient, err := createClientWithRetries(func() (interface{}, error) {
 			return client.NewNginxClient(httpClient, *scrapeURI)
@@ -218,6 +216,11 @@ func main() {
 			os.Exit(1)
 		}
 		prometheus.MustRegister(collector.NewNginxCollector(ossClient.(*client.NginxClient), "nginx", constLabels, logger))
+	}
+
+	if *nginxVts {
+		exporter := collector.VtsExporter{URI: *vtsScrapeURI, NAMESPACE: "nginx_vts", INSECURE: *vtsInsecure}
+		prometheus.MustRegister(exporter.NewVTSExporter(*vtsScrapeURI, "nginx_vts", *vtsInsecure))
 	}
 
 	prometheus.Unregister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts(prometheus.ProcessCollectorOpts{
