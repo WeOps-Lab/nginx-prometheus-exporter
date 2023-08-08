@@ -6,7 +6,8 @@ nodeSelector:
 
 serverBlock: |-
   server {
-    listen 0.0.0.0:8080;
+    listen 8080;
+    include  "/opt/bitnami/nginx/conf/bitnami/*.conf";
     location /stub_status {
       stub_status on;
       access_log   off;
