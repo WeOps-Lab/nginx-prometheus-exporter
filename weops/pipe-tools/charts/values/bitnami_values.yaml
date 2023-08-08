@@ -9,9 +9,15 @@ serverBlock: |-
   server {
     listen 8080;
     include  "/opt/bitnami/nginx/conf/bitnami/*.conf";
-    location /stub_status {
+
+    location /vts_status {
       vhost_traffic_status_display;
       vhost_traffic_status_display_format html;
+    }
+
+    location /stub_status {
+      stub_status on;
+      access_log   off;
     }
   }
 
