@@ -1,14 +1,14 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: nginx-exporter-{{VERSION}}
+  name: nginx-exporter-{{MODULE}}-{{VERSION}}
   namespace: nginx
 spec:
-  serviceName: nginx-exporter-{{VERSION}}
+  serviceName: nginx-exporter-{{MODULE}}-{{VERSION}}
   replicas: 1
   selector:
     matchLabels:
-      app: nginx-exporter-{{VERSION}}
+      app: nginx-exporter-{{MODULE}}-{{VERSION}}
   template:
     metadata:
       annotations:
@@ -45,9 +45,9 @@ spec:
         telegraf.influxdata.com/limits-cpu: '300m'
         telegraf.influxdata.com/limits-memory: '300Mi'
       labels:
-        app: nginx-exporter-{{VERSION}}
+        app: nginx-exporter-{{MODULE}}-{{VERSION}}
         exporter_object: nginx
-        object_mode: standalone
+        object_mode: {{MODULE}}
         object_version: {{VERSION}}
         pod_type: exporter
     spec:
@@ -55,7 +55,7 @@ spec:
         node-role: worker
       shareProcessNamespace: true
       containers:
-      - name: nginx-exporter-{{VERSION}}
+      - name: nginx-exporter-{{MODULE}}-{{VERSION}}
         image: registry-svc:25000/library/nginx-exporter:latest
         imagePullPolicy: Always
         securityContext:
@@ -66,7 +66,7 @@ spec:
           - -nginx.retry-interval=3s
         env:
         - name: NGINX_SCRAPE_URI
-          value: "http://nginx-{{VERSION}}.nginx:80/stub_status/format/json"
+          value: "http://nginx-{{MODULE}}-{{VERSION}}.nginx:80/{{MODULE}}_status/format/json"
         resources:
           requests:
             cpu: 100m
@@ -82,8 +82,8 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: nginx-exporter-{{VERSION}}
-  name: nginx-exporter-{{VERSION}}
+    app: nginx-exporter-{{MODULE}}-{{VERSION}}
+  name: nginx-exporter-{{MODULE}}-{{VERSION}}
   namespace: nginx
   annotations:
     prometheus.io/scrape: "true"
@@ -95,4 +95,4 @@ spec:
     protocol: TCP
     targetPort: 9113
   selector:
-    app: nginx-exporter-{{VERSION}}
+    app: nginx-exporter-{{MODULE}}-{{VERSION}}
