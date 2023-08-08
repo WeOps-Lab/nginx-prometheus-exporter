@@ -5,10 +5,19 @@ nodeSelector:
     node-role: worker
 
 serverBlock: |-
+  upstream backend{
+    server 127.0.0.1:80;
+  }
+
   vhost_traffic_status_zone;
+
   server {
+    server_name weops.org;
+
     listen 8080;
     include  "/opt/bitnami/nginx/conf/bitnami/*.conf";
+
+    vhost_traffic_status_filter_by_set_key $geoip_country_code country::$server_name;
 
     location /vts_status {
       vhost_traffic_status_display;
