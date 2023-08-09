@@ -146,7 +146,7 @@ type Cache struct {
 type VtsExporter struct {
 	URI                                                         string
 	NAMESPACE                                                   string
-	TIMEOUT                                                     int
+	TIMEOUT                                                     time.Duration
 	INSECURE                                                    bool
 	infoMetric                                                  *prometheus.Desc
 	serverMetrics, upstreamMetrics, filterMetrics, cacheMetrics map[string]*prometheus.Desc
@@ -180,11 +180,12 @@ func (e *VtsExporter) newCacheMetric(metricName string, docString string, labels
 	)
 }
 
-func (e *VtsExporter) NewVTSExporter(uri, namespace string, insecure bool) *VtsExporter {
+func (e *VtsExporter) NewVTSExporter(uri, namespace string, insecure bool, timeout time.Duration) *VtsExporter {
 	return &VtsExporter{
 		URI:        uri,
 		NAMESPACE:  namespace,
 		INSECURE:   insecure,
+		TIMEOUT:    timeout,
 		infoMetric: e.newServerMetric("uptime", "nginx info", []string{"hostName", "nginxVersion"}),
 		serverMetrics: map[string]*prometheus.Desc{
 			"connections": e.newServerMetric("connections", "nginx connections", []string{"status"}),
