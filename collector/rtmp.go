@@ -56,9 +56,9 @@ type RTMPExporter struct {
 	fetch                func() (io.ReadCloser, error)
 	streamNameNormalizer *regexp.Regexp
 	logger               log.Logger
-
-	serverMetrics map[string]*prometheus.Desc
-	streamMetrics map[string]*prometheus.Desc
+	upMetric             prometheus.Gauge
+	serverMetrics        map[string]*prometheus.Desc
+	streamMetrics        map[string]*prometheus.Desc
 }
 
 // ServerInfo characteristics of the RTMP server
@@ -144,6 +144,7 @@ func (e *RTMPExporter) NewRTMPExporter(uri string, timeout time.Duration, stream
 
 		serverMetrics: serverMetrics,
 		streamMetrics: streamMetrics,
+		upMetric:      newUpMetric(namespace, nil),
 	}, nil
 }
 
@@ -212,14 +213,23 @@ func (e *RTMPExporter) scrape(ch chan<- prometheus.Metric) {
 	data, err := e.fetch()
 	if err != nil {
 		level.Error(e.logger).Log("msg", "Can't scrape NGINX-RTMP", "err", err)
+		e.upMetric.Set(nginxDown)
+		ch <- e.upMetric
 		return
 	}
 	defer data.Close()
 
 	doc, err := xmlquery.Parse(data)
 	if err != nil {
+		level.Error(e.logger).Log("msg", "xml query Can't parse data", "err", err)
+		e.upMetric.Set(nginxDown)
+		ch <- e.upMetric
 		return
 	}
+
+	// up
+	e.upMetric.Set(nginxUp)
+	ch <- e.upMetric
 
 	server, err := e.parseServerStats(doc)
 	if err != nil {

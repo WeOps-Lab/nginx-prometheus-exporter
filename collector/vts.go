@@ -148,6 +148,7 @@ type VtsExporter struct {
 	NAMESPACE                                                   string
 	TIMEOUT                                                     time.Duration
 	INSECURE                                                    bool
+	upMetric                                                    prometheus.Gauge
 	infoMetric                                                  *prometheus.Desc
 	serverMetrics, upstreamMetrics, filterMetrics, cacheMetrics map[string]*prometheus.Desc
 }
@@ -186,6 +187,7 @@ func (e *VtsExporter) NewVTSExporter(uri, namespace string, insecure bool, timeo
 		NAMESPACE:  namespace,
 		INSECURE:   insecure,
 		TIMEOUT:    timeout,
+		upMetric:   newUpMetric(namespace, nil),
 		infoMetric: e.newServerMetric("uptime", "nginx info", []string{"hostName", "nginxVersion"}),
 		serverMetrics: map[string]*prometheus.Desc{
 			"connections": e.newServerMetric("connections", "nginx connections", []string{"status"}),
@@ -233,6 +235,8 @@ func (e *VtsExporter) Collect(ch chan<- prometheus.Metric) {
 	body, err := e.fetchHTTP(e.URI, time.Duration(e.TIMEOUT)*time.Second)()
 	if err != nil {
 		log.Println("fetchHTTP failed", err)
+		e.upMetric.Set(nginxDown)
+		ch <- e.upMetric
 		return
 	}
 	defer body.Close()
@@ -240,6 +244,8 @@ func (e *VtsExporter) Collect(ch chan<- prometheus.Metric) {
 	data, err := ioutil.ReadAll(body)
 	if err != nil {
 		log.Println("ioutil.ReadAll failed", err)
+		e.upMetric.Set(nginxDown)
+		ch <- e.upMetric
 		return
 	}
 
@@ -247,8 +253,14 @@ func (e *VtsExporter) Collect(ch chan<- prometheus.Metric) {
 	err = json.Unmarshal(data, &nginxVtx)
 	if err != nil {
 		log.Println("json.Unmarshal failed", err)
+		e.upMetric.Set(nginxDown)
+		ch <- e.upMetric
 		return
 	}
+
+	// up
+	e.upMetric.Set(nginxUp)
+	ch <- e.upMetric
 
 	// info
 	uptime := (nginxVtx.NowMsec - nginxVtx.LoadMsec) / 1000
