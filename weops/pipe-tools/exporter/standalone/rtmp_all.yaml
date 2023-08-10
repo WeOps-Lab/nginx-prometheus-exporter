@@ -55,7 +55,7 @@ spec:
         node-role: worker
       shareProcessNamespace: true
       containers:
-      - name: nginx-exporter-v1-23-rtmp-all
+      - name: nginx-exporter
         image: registry-svc:25000/library/nginx-exporter:latest
         imagePullPolicy: Always
         securityContext:
@@ -75,12 +75,9 @@ spec:
         - name: NGINX_RTMP_SCRAPE_URI
           value: "http://nginx-rtmp-service.nginx:80/statistics"
         resources:
-          requests:
-            cpu: 100m
-            memory: 100Mi
           limits:
-            cpu: 500m
-            memory: 500Mi
+            cpu: 300m
+            memory: 300Mi
         ports:
         - containerPort: 9113
 

@@ -6,7 +6,7 @@ metadata:
   annotations:
     experiment.chaos-mesh.org/pause: 'false'
 spec:
-  schedule: '*/3 * * * *'
+  schedule: '* * * * *'
   startingDeadlineSeconds: 5
   concurrencyPolicy: Allow
   historyLimit: 1
@@ -18,9 +18,10 @@ spec:
       labelSelectors:
         'pod_type': 'exporter'
     mode: all
+    containerNames: ['nginx-exporter']
     stressors:
       memory:
-        workers: 2
+        workers: 1
         size: 20%
       cpu:
         workers: 2

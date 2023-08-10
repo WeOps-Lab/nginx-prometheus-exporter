@@ -4,7 +4,7 @@ metadata:
   namespace: nginx
   name: nginx-network-delay
 spec:
-  schedule: '*/3 * * * *'
+  schedule: '* * * * *'
   startingDeadlineSeconds: 5
   concurrencyPolicy: 'Allow'
   historyLimit: 1
@@ -17,9 +17,9 @@ spec:
         'object': 'nginx'
     mode: all
     action: delay
-    duration: 4s
+    duration: 3s
     delay:
-      latency: '4000ms'
+      latency: '3000ms'
       correlation: '100'
       jitter: '0ms'
 

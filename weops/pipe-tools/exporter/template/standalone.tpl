@@ -54,15 +54,14 @@ spec:
         node-role: worker
       shareProcessNamespace: true
       containers:
-      - name: nginx-exporter-{{VERSION}}
+      - name: nginx-exporter
         image: registry-svc:25000/library/nginx-exporter:latest
         imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
           runAsUser: 0
         args:
-          - -nginx.timeout=3s
-          - -nginx.retry-interval=3s
+          - -nginx.timeout=2s
           - -nginx.common
           - -nginx.vts
         env:
@@ -71,12 +70,9 @@ spec:
         - name: NGINX_VTS_SCRAPE_URI
           value: "http://nginx-{{VERSION}}.nginx:80/vts_status/format/json"
         resources:
-          requests:
-            cpu: 100m
-            memory: 100Mi
           limits:
-            cpu: 500m
-            memory: 500Mi
+            cpu: 300m
+            memory: 300Mi
         ports:
         - containerPort: 9113
 
