@@ -6,8 +6,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"github.com/nginxinc/nginx-prometheus-exporter/client"
-	"github.com/prometheus/client_golang/prometheus/collectors"
 	"maps"
 	"net"
 	"net/http"
@@ -19,6 +17,7 @@ import (
 	"time"
 
 	plusclient "github.com/nginxinc/nginx-plus-go-client/client"
+	"github.com/nginxinc/nginx-prometheus-exporter/client"
 	"github.com/nginxinc/nginx-prometheus-exporter/collector"
 
 	"github.com/alecthomas/kingpin/v2"
@@ -84,33 +83,25 @@ var (
 	constLabels = map[string]string{}
 
 	// Command-line flags
-	webConfig     = kingpinflag.AddFlags(kingpin.CommandLine, ":9113")
-	metricsPath   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").Envar("TELEMETRY_PATH").String()
-	nginxPlus     = kingpin.Flag("nginx.plus", "Start the exporter for NGINX Plus. By default, the exporter is started for NGINX.").Default("false").Envar("NGINX_PLUS").Bool()
-	scrapeURIs    = kingpin.Flag("nginx.scrape-uri", "A URI or unix domain socket path for scraping NGINX or NGINX Plus metrics. For NGINX, the stub_status page must be available through the URI. For NGINX Plus -- the API. Repeatable for multiple URIs.").Default("http://127.0.0.1:8080/stub_status").Envar("SCRAPE_URI").HintOptions("http://127.0.0.1:8080/stub_status", "http://127.0.0.1:8080/api").Strings()
+	webConfig       = kingpinflag.AddFlags(kingpin.CommandLine, ":9113")
+	metricsPath     = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").Envar("TELEMETRY_PATH").String()
+	nginxPlus       = kingpin.Flag("nginx.plus", "Start the exporter for NGINX Plus. By default, the exporter is started for NGINX.").Default("false").Envar("NGINX_PLUS").Bool()
+	nginxCommon     = kingpin.Flag("nginx.common", "Start the exporter for NGINX. By default, the exporter is started for NGINX.").Default("false").Envar("NGINX_COMMON").Bool()
+	nginxVts        = kingpin.Flag("nginx.vts", "Start the exporter for NGINX VTS. By default, the exporter is started for NGINX.").Default("false").Envar("NGINX_VTS").Bool()
+	nginxRtmp       = kingpin.Flag("nginx.rtmp", "Start the exporter for NGINX RTMP. By default, the exporter is started for NGINX.").Default("false").Envar("NGINX_RTMP").Bool()
+	regexStreamName = kingpin.Flag("nginx.rtmp.regex-stream-name", "Regex to normalize stream name from NGINX-RTMP").Default(".*").Envar("NGINX_RTMP_REGEX_STREAM").String()
+	scrapeURIs      = kingpin.Flag("nginx.scrape-uri", "A URI or unix domain socket path for scraping NGINX or NGINX Plus metrics. For NGINX, the stub_status page must be available through the URI. For NGINX Plus -- the API. Repeatable for multiple URIs.").Default("http://127.0.0.1:8080/stub_status").Envar("SCRAPE_URI").HintOptions("http://127.0.0.1:8080/stub_status", "http://127.0.0.1:8080/api").Strings()
+	vtsScrapeURI    = kingpin.Flag("nginx.vts.scrape-uri", "A URI or unix domain socket path for scraping NGINX VTS metrics.").Default("http://127.0.0.1:8080/vts_status").Envar("NGINX_VTS_SCRAPE_URI").String()
+	rtmpScrapeURI   = kingpin.Flag("nginx.rtmp.scrape-uri", "URI on which to scrape NGINX-RTMP stats.").Default("http://127.0.0.1:8080/stats").Envar("NGINX_RTMP_SCRAPE_URI").String()
+
 	sslVerify     = kingpin.Flag("nginx.ssl-verify", "Perform SSL certificate verification.").Default("false").Envar("SSL_VERIFY").Bool()
 	sslCaCert     = kingpin.Flag("nginx.ssl-ca-cert", "Path to the PEM encoded CA certificate file used to validate the servers SSL certificate.").Default("").Envar("SSL_CA_CERT").String()
 	sslClientCert = kingpin.Flag("nginx.ssl-client-cert", "Path to the PEM encoded client certificate file to use when connecting to the server.").Default("").Envar("SSL_CLIENT_CERT").String()
 	sslClientKey  = kingpin.Flag("nginx.ssl-client-key", "Path to the PEM encoded client certificate key file to use when connecting to the server.").Default("").Envar("SSL_CLIENT_KEY").String()
-	webConfig       = kingpinflag.AddFlags(kingpin.CommandLine, ":9113")
-	metricsPath     = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").Envar("TELEMETRY_PATH").String()
-	nginxCommon     = kingpin.Flag("nginx.common", "Start the exporter for NGINX. By default, the exporter is started for NGINX.").Default("false").Envar("NGINX_COMMON").Bool()
-	nginxPlus       = kingpin.Flag("nginx.plus", "Start the exporter for NGINX Plus. By default, the exporter is started for NGINX.").Default("false").Envar("NGINX_PLUS").Bool()
-	nginxVts        = kingpin.Flag("nginx.vts", "Start the exporter for NGINX VTS. By default, the exporter is started for NGINX.").Default("false").Envar("NGINX_VTS").Bool()
-	nginxRtmp       = kingpin.Flag("nginx.rtmp", "Start the exporter for NGINX RTMP. By default, the exporter is started for NGINX.").Default("false").Envar("NGINX_RTMP").Bool()
-	regexStreamName = kingpin.Flag("nginx.rtmp.regex-stream-name", "Regex to normalize stream name from NGINX-RTMP").Default(".*").Envar("NGINX_RTMP_REGEX_STREAM").String()
-	scrapeURI       = kingpin.Flag("nginx.scrape-uri", "A URI or unix domain socket path for scraping NGINX or NGINX Plus metrics. For NGINX, the stub_status page must be available through the URI. For NGINX Plus -- the API.").Default("http://127.0.0.1:8080/stub_status").Envar("NGINX_SCRAPE_URI").String()
-	vtsScrapeURI    = kingpin.Flag("nginx.vts.scrape-uri", "A URI or unix domain socket path for scraping NGINX VTS metrics.").Default("http://127.0.0.1:8080/vts_status").Envar("NGINX_VTS_SCRAPE_URI").String()
-	rtmpScrapeURI   = kingpin.Flag("nginx.rtmp.scrape-uri", "URI on which to scrape NGINX-RTMP stats.").Default("http://127.0.0.1:8080/stats").Envar("NGINX_RTMP_SCRAPE_URI").String()
-	sslVerify       = kingpin.Flag("nginx.ssl-verify", "Perform SSL certificate verification.").Default("false").Envar("SSL_VERIFY").Bool()
-	sslCaCert       = kingpin.Flag("nginx.ssl-ca-cert", "Path to the PEM encoded CA certificate file used to validate the servers SSL certificate.").Default("").Envar("SSL_CA_CERT").String()
-	sslClientCert   = kingpin.Flag("nginx.ssl-client-cert", "Path to the PEM encoded client certificate file to use when connecting to the server.").Default("").Envar("SSL_CLIENT_CERT").String()
-	sslClientKey    = kingpin.Flag("nginx.ssl-client-key", "Path to the PEM encoded client certificate key file to use when connecting to the server.").Default("").Envar("SSL_CLIENT_KEY").String()
-	nginxRetries    = kingpin.Flag("nginx.retries", "A number of retries the exporter will make on start to connect to the NGINX stub_status page/NGINX Plus API before exiting with an error.").Default("0").Envar("NGINX_RETRIES").Uint()
-	vtsInsecure     = kingpin.Flag("insecure", "Ignore server certificate if using https").Default("true").Bool()
 
 	// Custom command-line flags
-	timeout = createPositiveDurationFlag(kingpin.Flag("nginx.timeout", "A timeout for scraping metrics from NGINX or NGINX Plus.").Default("5s").Envar("TIMEOUT").HintOptions("5s", "10s", "30s", "1m", "5m"))
+	timeout     = createPositiveDurationFlag(kingpin.Flag("nginx.timeout", "A timeout for scraping metrics from NGINX or NGINX Plus.").Default("5s").Envar("TIMEOUT").HintOptions("5s", "10s", "30s", "1m", "5m"))
+	vtsInsecure = kingpin.Flag("insecure", "Ignore server certificate if using https").Default("true").Bool()
 )
 
 const exporterName = "nginx_exporter"
@@ -187,64 +178,8 @@ func main() {
 			labels["addr"] = addr
 
 			registerCollector(logger, transport, addr, labels)
-	userAgent := fmt.Sprintf("NGINX-Prometheus-Exporter/v%v", version.Version)
-	userAgentRT := &userAgentRoundTripper{
-		agent: userAgent,
-		rt:    transport,
-	}
-
-	httpClient := &http.Client{
-		Timeout:   *timeout,
-		Transport: userAgentRT,
-	}
-
-	if *nginxPlus {
-		plusClient, err := createClientWithRetries(func() (interface{}, error) {
-			return plusclient.NewNginxClient(httpClient, *scrapeURI)
-		}, *nginxRetries, *nginxRetryInterval, logger)
-		if err != nil {
-			level.Error(logger).Log("msg", "Could not create Nginx Plus Client", "error", err.Error())
-			os.Exit(1)
 		}
-		variableLabelNames := collector.NewVariableLabelNames(nil, nil, nil, nil, nil, nil)
-		prometheus.MustRegister(collector.NewNginxPlusCollector(plusClient.(*plusclient.NginxClient), "nginxplus", variableLabelNames, constLabels, logger))
 	}
-
-	if *nginxCommon {
-		ossClient, err := createClientWithRetries(func() (interface{}, error) {
-			return client.NewNginxClient(httpClient, *scrapeURI)
-		}, *nginxRetries, *nginxRetryInterval, logger)
-		if err != nil {
-			level.Error(logger).Log("msg", "Could not create Nginx Client", "error", err.Error())
-			os.Exit(1)
-		}
-		prometheus.MustRegister(collector.NewNginxCollector(ossClient.(*client.NginxClient), "nginx", constLabels, logger))
-	}
-
-	if *nginxVts {
-		vtsExporter := collector.VtsExporter{URI: *vtsScrapeURI, NAMESPACE: "nginx_vts", INSECURE: *vtsInsecure, TIMEOUT: *timeout}
-		prometheus.MustRegister(vtsExporter.NewVTSExporter(*vtsScrapeURI, "nginx_vts", *vtsInsecure, *timeout))
-	}
-
-	if *nginxRtmp {
-		// Compile regex before starting the exporter and exits if it a bad regex
-		streamNameNormalizer := regexp.MustCompile(*regexStreamName)
-		tmpExporter := collector.RTMPExporter{URI: *rtmpScrapeURI, TIMEOUT: *timeout}
-
-		rtmpExporter, err := tmpExporter.NewRTMPExporter(*rtmpScrapeURI, *timeout, streamNameNormalizer, logger)
-		if err != nil {
-			level.Error(logger).Log("msg", "Error creating an exporter", "err", err)
-			os.Exit(1)
-		}
-		prometheus.MustRegister(rtmpExporter)
-	}
-
-	prometheus.Unregister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts(prometheus.ProcessCollectorOpts{
-		PidFn: func() (int, error) {
-			return os.Getpid(), nil
-		},
-	})))
-	prometheus.Unregister(collectors.NewGoCollector())
 
 	http.Handle(*metricsPath, promhttp.Handler())
 
@@ -328,10 +263,33 @@ func registerCollector(logger log.Logger, transport *http.Transport,
 		}
 		variableLabelNames := collector.NewVariableLabelNames(nil, nil, nil, nil, nil, nil, nil, nil)
 		prometheus.MustRegister(collector.NewNginxPlusCollector(plusClient, "nginxplus", variableLabelNames, labels, logger))
-	} else {
+	}
+
+	if *nginxCommon {
 		ossClient := client.NewNginxClient(httpClient, addr)
 		prometheus.MustRegister(collector.NewNginxCollector(ossClient, "nginx", labels, logger))
 	}
+
+	if *nginxVts {
+		vtsExporter := collector.VtsExporter{URI: *vtsScrapeURI, NAMESPACE: "nginx_vts", INSECURE: *vtsInsecure, TIMEOUT: *timeout}
+		prometheus.MustRegister(vtsExporter.NewVTSExporter(*vtsScrapeURI, "nginx_vts", *vtsInsecure, *timeout))
+	}
+
+	if *nginxRtmp {
+		// Compile regex before starting the exporter and exits if it a bad regex
+		streamNameNormalizer := regexp.MustCompile(*regexStreamName)
+		tmpExporter := collector.RTMPExporter{URI: *rtmpScrapeURI, TIMEOUT: *timeout}
+
+		rtmpExporter, err := tmpExporter.NewRTMPExporter(*rtmpScrapeURI, *timeout, streamNameNormalizer, logger)
+		if err != nil {
+			level.Error(logger).Log("msg", "Error creating an exporter", "err", err)
+			os.Exit(1)
+		}
+		prometheus.MustRegister(rtmpExporter)
+	}
+
+	// Remove Go collector
+	prometheus.Unregister(prometheus.NewGoCollector())
 }
 
 type userAgentRoundTripper struct {
