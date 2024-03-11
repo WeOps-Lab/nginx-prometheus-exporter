@@ -63,7 +63,6 @@ spec:
           runAsUser: 0
         args:
           - --nginx.timeout=3s
-          - --nginx.retry-interval=3s
           - --nginx.common
           - --nginx.vts
           - --nginx.rtmp
