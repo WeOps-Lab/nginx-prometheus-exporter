@@ -61,9 +61,9 @@ spec:
           allowPrivilegeEscalation: false
           runAsUser: 0
         args:
-          - -nginx.timeout=2s
-          - -nginx.common
-          - -nginx.vts
+          - --nginx.timeout=2s
+          - --nginx.common
+          - --nginx.vts
         env:
         - name: NGINX_SCRAPE_URI
           value: "http://nginx-{{VERSION}}.nginx:80/stub_status"

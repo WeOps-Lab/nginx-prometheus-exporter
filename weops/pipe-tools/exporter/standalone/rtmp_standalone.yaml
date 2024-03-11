@@ -62,9 +62,9 @@ spec:
           allowPrivilegeEscalation: false
           runAsUser: 0
         args:
-          - -nginx.timeout=3s
-          - -nginx.retry-interval=3s
-          - -nginx.rtmp
+          - --nginx.timeout=3s
+          - --nginx.retry-interval=3s
+          - --nginx.rtmp
         env:
         - name: NGINX_RTMP_SCRAPE_URI
           value: "http://nginx-rtmp-service.nginx:80/statistics"
