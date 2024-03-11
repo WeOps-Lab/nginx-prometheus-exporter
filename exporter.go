@@ -90,7 +90,7 @@ var (
 	nginxVts        = kingpin.Flag("nginx.vts", "Start the exporter for NGINX VTS. By default, the exporter is started for NGINX.").Default("false").Envar("NGINX_VTS").Bool()
 	nginxRtmp       = kingpin.Flag("nginx.rtmp", "Start the exporter for NGINX RTMP. By default, the exporter is started for NGINX.").Default("false").Envar("NGINX_RTMP").Bool()
 	regexStreamName = kingpin.Flag("nginx.rtmp.regex-stream-name", "Regex to normalize stream name from NGINX-RTMP").Default(".*").Envar("NGINX_RTMP_REGEX_STREAM").String()
-	scrapeURIs      = kingpin.Flag("nginx.scrape-uri", "A URI or unix domain socket path for scraping NGINX or NGINX Plus metrics. For NGINX, the stub_status page must be available through the URI. For NGINX Plus -- the API. Repeatable for multiple URIs.").Default("http://127.0.0.1:8080/stub_status").Envar("SCRAPE_URI").HintOptions("http://127.0.0.1:8080/stub_status", "http://127.0.0.1:8080/api").Strings()
+	scrapeURIs      = kingpin.Flag("nginx.scrape-uri", "A URI or unix domain socket path for scraping NGINX or NGINX Plus metrics. For NGINX, the stub_status page must be available through the URI. For NGINX Plus -- the API. Repeatable for multiple URIs.").Default("http://127.0.0.1:8080/stub_status").Envar("SCRAPE_URI").HintOptions("http://127.0.0.1:8080/stub_status", "http://127.0.0.1:8080/api").Envar("NGINX_SCRAPE_URI").Strings()
 	vtsScrapeURI    = kingpin.Flag("nginx.vts.scrape-uri", "A URI or unix domain socket path for scraping NGINX VTS metrics.").Default("http://127.0.0.1:8080/vts_status").Envar("NGINX_VTS_SCRAPE_URI").String()
 	rtmpScrapeURI   = kingpin.Flag("nginx.rtmp.scrape-uri", "URI on which to scrape NGINX-RTMP stats.").Default("http://127.0.0.1:8080/stats").Envar("NGINX_RTMP_SCRAPE_URI").String()
 
