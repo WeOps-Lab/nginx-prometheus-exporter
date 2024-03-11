@@ -14,6 +14,12 @@ server accepts handled requests
 Reading: %d Writing: %d Waiting: %d
 `
 
+const templateTengineMetrics string = `Active connections: %d
+server accepts handled requests request_time 
+%d %d %d %d 
+Reading: %d Writing: %d Waiting: %d
+`
+
 // NginxClient allows you to fetch NGINX metrics from the stub_status page.
 type NginxClient struct {
 	apiEndpoint string
@@ -22,8 +28,9 @@ type NginxClient struct {
 
 // StubStats represents NGINX stub_status metrics.
 type StubStats struct {
-	Connections StubConnections
-	Requests    int64
+	Connections  StubConnections
+	Requests     int64
+	RequestsTime int64
 }
 
 // StubConnections represents connections related metrics.
@@ -82,15 +89,38 @@ func (client *NginxClient) GetStubStats() (*StubStats, error) {
 
 func parseStubStats(r io.Reader) (*StubStats, error) {
 	var s StubStats
-	if _, err := fmt.Fscanf(r, templateMetrics,
+
+	// 读取输入流到缓冲区
+	buf1 := new(bytes.Buffer)
+	if _, err := buf1.ReadFrom(r); err != nil {
+		return nil, err
+	}
+
+	// 复制一份输入流到第二个缓冲区
+	buf2 := bytes.NewBuffer(buf1.Bytes())
+
+	if _, err := fmt.Fscanf(buf1, templateMetrics,
 		&s.Connections.Active,
 		&s.Connections.Accepted,
 		&s.Connections.Handled,
 		&s.Requests,
 		&s.Connections.Reading,
 		&s.Connections.Writing,
-		&s.Connections.Waiting); err != nil {
-		return nil, fmt.Errorf("failed to scan template metrics: %w", err)
+		&s.Connections.Waiting); err == nil {
+		return &s, nil
 	}
-	return &s, nil
+
+	if _, err := fmt.Fscanf(buf2, templateTengineMetrics,
+		&s.Connections.Active,
+		&s.Connections.Accepted,
+		&s.Connections.Handled,
+		&s.Requests,
+		&s.RequestsTime,
+		&s.Connections.Reading,
+		&s.Connections.Writing,
+		&s.Connections.Waiting); err == nil {
+		return &s, nil
+	}
+
+	return nil, fmt.Errorf("failed to parse template metrics")
 }
