@@ -1,23 +1,27 @@
 change:
-  - head-branch: ['^change/']
+  - head-branch: ["^change/"]
 
 enhancement:
-  - head-branch: ['^feature/', '^feat/', '^enhancement/', '^enh/']
+  - head-branch: ["^feature/", "^feat/", "^enhancement/", "^enh/"]
 
 bug:
-  - head-branch: ['^fix/', '^bug/']
+  - head-branch: ["^fix/", "^bug/"]
 
 chore:
-  - head-branch: ['^chore/']
+  - head-branch: ["^chore/"]
 
 tests:
-  - head-branch: ['^tests/', '^test/']
-  - changed-files: '**/*_test.go'
+  - head-branch: ["^tests/", "^test/"]
+  - changed-files:
+      - any-glob-to-any-file: "**/*_test.go"
 
 documentation:
-  - head-branch: ['^docs/', '^doc/']
-  - changed-files: '**/*.md'
+  - head-branch: ["^docs/", "^doc/"]
+  - changed-files:
+      - any-glob-to-any-file: "**/*.md"
 
 dependencies:
-  - head-branch: ['^deps/', '^dep/', '^dependabot/']
-  - changed-files: ['go.mod', 'go.sum']
+  - head-branch:
+      ["^deps/", "^dep/", "^dependabot/", "pre-commit-ci-update-config"]
+  - changed-files:
+      - any-glob-to-any-file: ["go.mod", "go.sum"]

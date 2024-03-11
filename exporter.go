@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/nginxinc/nginx-prometheus-exporter/client"
 	"github.com/prometheus/client_golang/prometheus/collectors"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -63,29 +64,12 @@ func createPositiveDurationFlag(s kingpin.Settings) (target *time.Duration) {
 	return
 }
 
-func createClientWithRetries(getClient func() (interface{}, error), retries uint, retryInterval time.Duration, logger log.Logger) (interface{}, error) {
-	var err error
-	var nginxClient interface{}
-
-	for i := 0; i <= int(retries); i++ {
-		nginxClient, err = getClient()
-		if err == nil {
-			return nginxClient, nil
-		}
-		if i < int(retries) {
-			level.Error(logger).Log("msg", fmt.Sprintf("Could not create Nginx Client. Retrying in %v...", retryInterval))
-			time.Sleep(retryInterval)
-		}
-	}
-	return nil, err
-}
-
 func parseUnixSocketAddress(address string) (string, string, error) {
 	addressParts := strings.Split(address, ":")
 	addressPartsLength := len(addressParts)
 
 	if addressPartsLength > 3 || addressPartsLength < 1 {
-		return "", "", fmt.Errorf("address for unix domain socket has wrong format")
+		return "", "", errors.New("address for unix domain socket has wrong format")
 	}
 
 	unixSocketPath := addressParts[1]
@@ -100,6 +84,14 @@ var (
 	constLabels = map[string]string{}
 
 	// Command-line flags
+	webConfig     = kingpinflag.AddFlags(kingpin.CommandLine, ":9113")
+	metricsPath   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").Envar("TELEMETRY_PATH").String()
+	nginxPlus     = kingpin.Flag("nginx.plus", "Start the exporter for NGINX Plus. By default, the exporter is started for NGINX.").Default("false").Envar("NGINX_PLUS").Bool()
+	scrapeURIs    = kingpin.Flag("nginx.scrape-uri", "A URI or unix domain socket path for scraping NGINX or NGINX Plus metrics. For NGINX, the stub_status page must be available through the URI. For NGINX Plus -- the API. Repeatable for multiple URIs.").Default("http://127.0.0.1:8080/stub_status").Envar("SCRAPE_URI").HintOptions("http://127.0.0.1:8080/stub_status", "http://127.0.0.1:8080/api").Strings()
+	sslVerify     = kingpin.Flag("nginx.ssl-verify", "Perform SSL certificate verification.").Default("false").Envar("SSL_VERIFY").Bool()
+	sslCaCert     = kingpin.Flag("nginx.ssl-ca-cert", "Path to the PEM encoded CA certificate file used to validate the servers SSL certificate.").Default("").Envar("SSL_CA_CERT").String()
+	sslClientCert = kingpin.Flag("nginx.ssl-client-cert", "Path to the PEM encoded client certificate file to use when connecting to the server.").Default("").Envar("SSL_CLIENT_CERT").String()
+	sslClientKey  = kingpin.Flag("nginx.ssl-client-key", "Path to the PEM encoded client certificate key file to use when connecting to the server.").Default("").Envar("SSL_CLIENT_KEY").String()
 	webConfig       = kingpinflag.AddFlags(kingpin.CommandLine, ":9113")
 	metricsPath     = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").Envar("TELEMETRY_PATH").String()
 	nginxCommon     = kingpin.Flag("nginx.common", "Start the exporter for NGINX. By default, the exporter is started for NGINX.").Default("false").Envar("NGINX_COMMON").Bool()
@@ -118,8 +110,7 @@ var (
 	vtsInsecure     = kingpin.Flag("insecure", "Ignore server certificate if using https").Default("true").Bool()
 
 	// Custom command-line flags
-	timeout            = createPositiveDurationFlag(kingpin.Flag("nginx.timeout", "A timeout for scraping metrics from NGINX or NGINX Plus.").Default("5s").Envar("TIMEOUT"))
-	nginxRetryInterval = createPositiveDurationFlag(kingpin.Flag("nginx.retry-interval", "An interval between retries to connect to the NGINX stub_status page/NGINX Plus API on start.").Default("5s").Envar("NGINX_RETRY_INTERVAL"))
+	timeout = createPositiveDurationFlag(kingpin.Flag("nginx.timeout", "A timeout for scraping metrics from NGINX or NGINX Plus.").Default("5s").Envar("TIMEOUT").HintOptions("5s", "10s", "30s", "1m", "5m"))
 )
 
 const exporterName = "nginx_exporter"
@@ -127,26 +118,35 @@ const exporterName = "nginx_exporter"
 func main() {
 	kingpin.Flag("prometheus.const-label", "Label that will be used in every metric. Format is label=value. It can be repeated multiple times.").Envar("CONST_LABELS").StringMapVar(&constLabels)
 
-	promlogConfig := &promlog.Config{}
-	logger := promlog.New(promlogConfig)
-
 	// convert deprecated flags to new format
 	for i, arg := range os.Args {
-		if strings.HasPrefix(arg, "-") && len(arg) > 1 {
-			newArg := fmt.Sprintf("-%s", arg)
+		if strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && len(arg) > 2 {
+			newArg := "-" + arg
+			fmt.Printf("the flag format is deprecated and will be removed in a future release, please use the new format: %s\n", newArg)
 			os.Args[i] = newArg
 		}
 	}
 
+	promlogConfig := &promlog.Config{}
+
 	flag.AddFlags(kingpin.CommandLine, promlogConfig)
 	kingpin.Version(version.Print(exporterName))
 	kingpin.HelpFlag.Short('h')
+
+	addMissingEnvironmentFlags(kingpin.CommandLine)
+
 	kingpin.Parse()
+	logger := promlog.New(promlogConfig)
 
 	level.Info(logger).Log("msg", "Starting nginx-prometheus-exporter", "version", version.Info())
 	level.Info(logger).Log("msg", "Build context", "build_context", version.BuildContext())
 
 	prometheus.MustRegister(version.NewCollector(exporterName))
+
+	if len(*scrapeURIs) == 0 {
+		level.Error(logger).Log("msg", "No scrape addresses provided")
+		os.Exit(1)
+	}
 
 	// #nosec G402
 	sslConfig := &tls.Config{InsecureSkipVerify: !*sslVerify}
@@ -177,20 +177,16 @@ func main() {
 	transport := &http.Transport{
 		TLSClientConfig: sslConfig,
 	}
-	if strings.HasPrefix(*scrapeURI, "unix:") {
-		socketPath, requestPath, err := parseUnixSocketAddress(*scrapeURI)
-		if err != nil {
-			level.Error(logger).Log("msg", "Parsing unix domain socket scrape address failed", "uri", *scrapeURI, "error", err.Error())
-			os.Exit(1)
-		}
 
-		transport.DialContext = func(_ context.Context, _, _ string) (net.Conn, error) {
-			return net.Dial("unix", socketPath)
-		}
-		newScrapeURI := "http://unix" + requestPath
-		scrapeURI = &newScrapeURI
-	}
+	if len(*scrapeURIs) == 1 {
+		registerCollector(logger, transport, (*scrapeURIs)[0], constLabels)
+	} else {
+		for _, addr := range *scrapeURIs {
+			// add scrape URI to const labels
+			labels := maps.Clone(constLabels)
+			labels["addr"] = addr
 
+			registerCollector(logger, transport, addr, labels)
 	userAgent := fmt.Sprintf("NGINX-Prometheus-Exporter/v%v", version.Version)
 	userAgentRT := &userAgentRoundTripper{
 		agent: userAgent,
@@ -298,9 +294,49 @@ func main() {
 	_ = srv.Shutdown(srvCtx)
 }
 
+func registerCollector(logger log.Logger, transport *http.Transport,
+	addr string, labels map[string]string,
+) {
+	if strings.HasPrefix(addr, "unix:") {
+		socketPath, requestPath, err := parseUnixSocketAddress(addr)
+		if err != nil {
+			level.Error(logger).Log("msg", "Parsing unix domain socket scrape address failed", "uri", addr, "error", err.Error())
+			os.Exit(1)
+		}
+
+		transport.DialContext = func(_ context.Context, _, _ string) (net.Conn, error) {
+			return net.Dial("unix", socketPath)
+		}
+		addr = "http://unix" + requestPath
+	}
+
+	userAgent := fmt.Sprintf("NGINX-Prometheus-Exporter/v%v", version.Version)
+
+	httpClient := &http.Client{
+		Timeout: *timeout,
+		Transport: &userAgentRoundTripper{
+			agent: userAgent,
+			rt:    transport,
+		},
+	}
+
+	if *nginxPlus {
+		plusClient, err := plusclient.NewNginxClient(addr, plusclient.WithHTTPClient(httpClient))
+		if err != nil {
+			level.Error(logger).Log("msg", "Could not create Nginx Plus Client", "error", err.Error())
+			os.Exit(1)
+		}
+		variableLabelNames := collector.NewVariableLabelNames(nil, nil, nil, nil, nil, nil, nil, nil)
+		prometheus.MustRegister(collector.NewNginxPlusCollector(plusClient, "nginxplus", variableLabelNames, labels, logger))
+	} else {
+		ossClient := client.NewNginxClient(httpClient, addr)
+		prometheus.MustRegister(collector.NewNginxCollector(ossClient, "nginx", labels, logger))
+	}
+}
+
 type userAgentRoundTripper struct {
-	agent string
 	rt    http.RoundTripper
+	agent string
 }
 
 func (rt *userAgentRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -321,4 +357,25 @@ func cloneRequest(req *http.Request) *http.Request {
 		r.Header[key] = newValues
 	}
 	return r
+}
+
+// addMissingEnvironmentFlags sets Envar on any flag which has
+// the "web." prefix which doesn't already have an Envar set
+func addMissingEnvironmentFlags(ka *kingpin.Application) {
+	for _, f := range ka.Model().FlagGroupModel.Flags {
+		if strings.HasPrefix(f.Name, "web.") && f.Envar == "" {
+			flag := ka.GetFlag(f.Name)
+			if flag != nil {
+				flag.Envar(convertFlagToEnvar(strings.TrimPrefix(f.Name, "web.")))
+			}
+		}
+	}
+}
+
+func convertFlagToEnvar(f string) string {
+	env := strings.ToUpper(f)
+	for _, s := range []string{"-", "."} {
+		env = strings.ReplaceAll(env, s, "_")
+	}
+	return env
 }

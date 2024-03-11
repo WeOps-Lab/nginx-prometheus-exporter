@@ -1,90 +1,13 @@
 package main
 
 import (
-	"errors"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/go-kit/log"
+	"github.com/alecthomas/kingpin/v2"
+	"github.com/prometheus/exporter-toolkit/web/kingpinflag"
 )
-
-func TestCreateClientWithRetries(t *testing.T) {
-	t.Parallel()
-
-	type args struct {
-		client        interface{}
-		err           error
-		retries       uint
-		retryInterval time.Duration
-	}
-
-	tests := []struct {
-		name            string
-		args            args
-		expectedRetries int
-		want            interface{}
-		wantErr         bool
-	}{
-		{
-			name: "getClient returns a valid client",
-			args: args{
-				client: "client",
-				err:    nil,
-			},
-			expectedRetries: 0,
-			want:            "client",
-			wantErr:         false,
-		},
-		{
-			name: "getClient returns an error after no retries",
-			args: args{
-				client: nil,
-				err:    errors.New("error"),
-			},
-			expectedRetries: 0,
-			want:            nil,
-			wantErr:         true,
-		},
-		{
-			name: "getClient returns an error after retries",
-			args: args{
-				client:        nil,
-				err:           errors.New("error"),
-				retries:       3,
-				retryInterval: time.Millisecond * 1,
-			},
-			expectedRetries: 3,
-			want:            nil,
-			wantErr:         true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			invocations := 0
-			getClient := func() (interface{}, error) {
-				invocations++
-				return tt.args.client, tt.args.err
-			}
-
-			got, err := createClientWithRetries(getClient, tt.args.retries, tt.args.retryInterval, log.NewNopLogger())
-
-			actualRetries := invocations - 1
-
-			if actualRetries != tt.expectedRetries {
-				t.Errorf("createClientWithRetries() got %v retries, expected %v", actualRetries, tt.expectedRetries)
-				return
-			} else if (err != nil) != tt.wantErr {
-				t.Errorf("createClientWithRetries() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			} else if err != nil && tt.wantErr {
-				return
-			} else if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("createClientWithRetries() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
 
 func TestParsePositiveDuration(t *testing.T) {
 	t.Parallel()
@@ -115,7 +38,9 @@ func TestParsePositiveDuration(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := parsePositiveDuration(tt.testInput)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parsePositiveDuration() error = %v, wantErr %v", err, tt.wantErr)
@@ -168,7 +93,9 @@ func TestParseUnixSocketAddress(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			socketPath, requestPath, err := parseUnixSocketAddress(tt.testInput)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseUnixSocketAddress() error = %v, wantErr %v", err, tt.wantErr)
@@ -181,5 +108,63 @@ func TestParseUnixSocketAddress(t *testing.T) {
 				t.Errorf("request path: parseUnixSocketAddress() = %v, want %v", requestPath, tt.wantRequestPath)
 			}
 		})
+	}
+}
+
+func TestAddMissingEnvironmentFlags(t *testing.T) {
+	expectedMatches := map[string]string{
+		"non-matching-flag":  "",
+		"web.missing-env":    "MISSING_ENV",
+		"web.has-env":        "HAS_ENV_ALREADY",
+		"web.listen-address": "LISTEN_ADDRESS",
+		"web.config.file":    "CONFIG_FILE",
+	}
+	kingpinflag.AddFlags(kingpin.CommandLine, ":9113")
+	kingpin.Flag("non-matching-flag", "").String()
+	kingpin.Flag("web.missing-env", "").String()
+	kingpin.Flag("web.has-env", "").Envar("HAS_ENV_ALREADY").String()
+	addMissingEnvironmentFlags(kingpin.CommandLine)
+
+	// using Envar() on a flag returned from GetFlag()
+	// adds an additional flag, which is processed correctly
+	// at runtime but means that we need to check for a match
+	// instead of checking the envar of each matching flag name
+	for k, v := range expectedMatches {
+		matched := false
+		for _, f := range kingpin.CommandLine.Model().FlagGroupModel.Flags {
+			if f.Name == k && f.Envar == v {
+				matched = true
+			}
+		}
+		if !matched {
+			t.Errorf("missing %s envar for %s", v, k)
+		}
+	}
+}
+
+func TestConvertFlagToEnvar(t *testing.T) {
+	cases := []struct {
+		input  string
+		output string
+	}{
+		{
+			input:  "dot.separate",
+			output: "DOT_SEPARATE",
+		},
+		{
+			input:  "underscore_separate",
+			output: "UNDERSCORE_SEPARATE",
+		},
+		{
+			input:  "mixed_separate_options",
+			output: "MIXED_SEPARATE_OPTIONS",
+		},
+	}
+
+	for _, c := range cases {
+		res := convertFlagToEnvar(c.input)
+		if res != c.output {
+			t.Errorf("expected %s to resolve to %s but got %s", c.input, c.output, res)
+		}
 	}
 }

@@ -1,3 +1,8 @@
+before:
+  hooks:
+    - ./scripts/completions.sh
+    - ./scripts/manpages.sh
+
 builds:
   - env:
       - CGO_ENABLED=0
@@ -38,6 +43,11 @@ archives:
   - format_overrides:
       - goos: windows
         format: zip
+    files:
+      - README.md
+      - LICENSE
+      - completions/*
+      - manpages/*
 
 sboms:
   - artifacts: archive
@@ -45,19 +55,33 @@ sboms:
       - "${artifact}.spdx.json"
 
 brews:
-  - tap:
+  - repository:
       owner: nginxinc
       name: homebrew-tap
-      token: '{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}'
+      token: '{{ .Env.NGINX_GITHUB_TOKEN }}'
     folder: Formula
-    homepage: https://www.nginx.com/
+    homepage: https://github.com/nginxinc/nginx-prometheus-exporter
     description: NGINX Prometheus Exporter for NGINX and NGINX Plus
     license: Apache-2.0
-    install: |
-      bin.install "nginx-prometheus-exporter"
     commit_author:
       name: nginx-bot
       email: integrations@nginx.com
+    extra_install: |-
+      bash_completion.install "completions/nginx-prometheus-exporter.bash" => "nginx-prometheus-exporter"
+      zsh_completion.install "completions/nginx-prometheus-exporter.zsh" => "_nginx-prometheus-exporter"
+      man1.install "manpages/nginx-prometheus-exporter.1.gz"
+
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    output: true
+    certificate: '${artifact}.pem'
+    args:
+      - sign-blob
+      - "--output-signature=${signature}"
+      - "--output-certificate=${certificate}"
+      - "${artifact}"
+      - "--yes"
 
 announce:
   slack:
@@ -70,3 +94,70 @@ milestones:
 
 snapshot:
   name_template: 'edge'
+
+snapcrafts:
+  - name_template: '{{ .ProjectName }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+    title: NGINX Prometheus Exporter
+    summary: NGINX Prometheus Exporter for NGINX and NGINX Plus
+    description: |
+      NGINX Prometheus exporter fetches the metrics from NGINX or NGINX Plus,
+      converts the metrics into appropriate Prometheus metrics types and finally exposes
+      them via an HTTP server to be collected by Prometheus.
+    grade: stable
+    confinement: strict
+    publish: true
+    license: 'Apache-2.0'
+    apps:
+      nginx-prometheus-exporter:
+        command: nginx-prometheus-exporter
+        plugs: ["network", "network-bind"]
+        completer: completions/nginx-prometheus-exporter.bash
+    disable: "{{ if .IsSnapshot }}true{{ end }}"
+
+nix:
+  - name: nginx-prometheus-exporter
+    repository:
+      owner: nginxinc
+      name: nur
+      token: '{{ .Env.NGINX_GITHUB_TOKEN }}'
+    homepage: https://github.com/nginxinc/nginx-prometheus-exporter
+    description: NGINX Prometheus Exporter for NGINX and NGINX Plus
+    license: asl20
+    commit_author:
+      name: nginx-bot
+      email: integrations@nginx.com
+    extra_install: |-
+      installManPage ./manpages/nginx-prometheus-exporter.1.gz
+      installShellCompletion ./completions/*
+
+winget:
+  - name: nginx-prometheus-exporter
+    publisher: nginxinc
+    license: Apache-2.0
+    homepage: https://github.com/nginxinc/nginx-prometheus-exporter
+    short_description: NGINX Prometheus Exporter for NGINX and NGINX Plus
+    repository:
+      owner: nginxinc
+      name: winget-pkgs
+      token: '{{ .Env.NGINX_GITHUB_TOKEN }}'
+      branch: "nginx-prometheus-exporter-{{.Version}}"
+      pull_request:
+        enabled: true
+        draft: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
+
+scoops:
+  - repository:
+      owner: nginxinc
+      name: scoop-bucket
+      token: '{{ .Env.NGINX_GITHUB_TOKEN }}'
+    folder: bucket
+    homepage: https://github.com/nginxinc/nginx-prometheus-exporter
+    description: NGINX Prometheus Exporter for NGINX and NGINX Plus
+    license: Apache-2.0
+    commit_author:
+      name: nginx-bot
+      email: integrations@nginx.com
