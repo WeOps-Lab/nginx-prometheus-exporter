@@ -18,20 +18,20 @@ Nginx Exporter通过解析 Nginx 的状态页面和其他可访问的信息源, 
 
 ### 参数说明
 
-| **参数名**                       | **含义**                         | **是否必填** | **使用举例**                          |
-|-------------------------------|--------------------------------|----------|-----------------------------------|
-| -nginx.common                 | nginx stub采集开关(**开关参数**), 默认打开 | 是        |                                   |
-| NGINX_SCRAPE_URI              | nginx stub访问地址(**环境变量**)       | 否        | http://127.0.0.1:8080/stub_status |
-| -nginx.vts                    | nginx vts采集开关(**开关参数**), 默认关闭            | 是        |                                   |  |
-| NGINX_VTS_SCRAPE_URI          | nginx vts访问地址(**环境变量**)                  | 否        | http://127.0.0.1:8080/vts_status  |
-| -nginx.rtmp                   | nginx rtmp采集开关(**开关参数**), 默认关闭           | 是        |                                   |
-| NGINX_RTMP_SCRAPE_URI         | nginx rtmp访问地址(**环境变量**)                 | 否        | http://127.0.0.1:8080/rtmp_status |
-| NGINX_RTMP_REGEX_STREAM | nginx rtmp音视频流正则过滤(**环境变量**), 默认采集所有     | 否        | .*                                |
-| -nginx.timeout                | nginx采集超时时间, 默认为5s             | 是        | 5s                                |
-| -log.level                    | 日志级别                           | 否        | info                              |
-| --web.listen-address          | exporter监听id及端口地址              | 否        | 127.0.0.1:9601                    |
+| **参数名**                 | **含义**                               | **是否必填** | **使用举例**                          |
+|-------------------------|--------------------------------------|----------|-----------------------------------|
+| -nginx.common           | nginx stub采集开关(**开关参数**), 默认打开       | 是        |                                   |
+| NGINX_SCRAPE_URI        | nginx stub访问地址(**环境变量**)             | 否        | http://127.0.0.1:8080/stub_status |
+| -nginx.vts              | nginx vts采集开关(**开关参数**), 默认关闭        | 是        |                                   |  |
+| NGINX_VTS_SCRAPE_URI    | nginx vts访问地址(**环境变量**)              | 否        | http://127.0.0.1:8080/vts_status  |
+| -nginx.rtmp             | nginx rtmp采集开关(**开关参数**), 默认关闭       | 是        |                                   |
+| NGINX_RTMP_SCRAPE_URI   | nginx rtmp访问地址(**环境变量**)             | 否        | http://127.0.0.1:8080/rtmp_status |
+| NGINX_RTMP_REGEX_STREAM | nginx rtmp音视频流正则过滤(**环境变量**), 默认采集所有 | 否        | .*                                |
+| -nginx.timeout          | nginx采集超时时间, 默认为5s                   | 是        | 5s                                |
+| -log.level              | 日志级别                                 | 否        | info                              |
+| --web.listen-address    | exporter监听id及端口地址                    | 否        | 127.0.0.1:9601                    |
 
-
+**注意**: 如果采集的是tengine, 暂不支持vts和rtmp模块的监控采集  
 
 ### 使用指引
 **注意：采集器所在的服务器需要能够正常访问对应模块功能的地址。**  
@@ -150,6 +150,10 @@ Nginx Exporter通过解析 Nginx 的状态页面和其他可访问的信息源, 
 #### weops_nginx_exporter 7.3.3
 
 - weops调整
+
+#### weops_nginx_exporter 7.3.4
+
+- 支持tengine
 
 添加“小嘉”微信即可获取nginx监控指标最佳实践礼包，其他更多问题欢迎咨询
 
