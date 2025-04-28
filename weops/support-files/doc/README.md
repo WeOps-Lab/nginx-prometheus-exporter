@@ -2,13 +2,15 @@
 
 ## 使用说明
 
-### 插件功能  
+### 插件功能
 
 Nginx Exporter通过解析 Nginx 的状态页面和其他可访问的信息源, 从中提取出有价值的监控数据。 该工具能够将从 Nginx 收集到的数据转换为易于理解和分析的监控指标，使用户能够更轻松地监视和评估 Nginx 实例的性能。收集多种关键的 Nginx 指标，从而实现性能优化和故障排查。
 
 ### 版本支持
 
 操作系统支持: linux, windows
+
+Windows版本: Windows 10+ or Windows Server 2016+
 
 是否支持arm: 支持
 
@@ -31,17 +33,17 @@ Nginx Exporter通过解析 Nginx 的状态页面和其他可访问的信息源, 
 | -log.level              | 日志级别                                 | 否        | info                              |
 | --web.listen-address    | exporter监听id及端口地址                    | 否        | 127.0.0.1:9601                    |
 
-**注意**: 如果采集的是tengine, 暂不支持vts和rtmp模块的监控采集  
+**注意**: 如果采集的是tengine, 暂不支持vts和rtmp模块的监控采集
 
 ### 使用指引
-**注意：采集器所在的服务器需要能够正常访问对应模块功能的地址。**  
+**注意：采集器所在的服务器需要能够正常访问对应模块功能的地址。**
 
 1. nginx配置
    采集nginx基础指标需要开启stub_status模块。
    采集vts类指标需要开启vts模块, 提供对 nginx 虚拟机主机状态数据的访问，可将数据输出格式为json、html、jsonp、prometheus。
    采集rtmp类指标需要开启rtmp模块。
 
-2. 检查模块配置  
+2. 检查模块配置
    通过 `nginx -V` 查看模块是否添加成功, 可看到示例中已安装stub_status和vts模块
    ```
    nginx -V
@@ -56,28 +58,28 @@ Nginx Exporter通过解析 Nginx 的状态页面和其他可访问的信息源, 
 3. nginx配置文件
    文件内容示例(一般为nginx.conf)
    ```
-   # 开启 upstram zones 
+   # 开启 upstram zones
    upstream backend{
      server 127.0.0.1:80;
    }
-   
+
    vhost_traffic_status_zone;  # 开启vts统计模块
    vhost_traffic_status_filter_by_host on;  # 打开vts vhost过滤
    vhost_traffic_status_filter_by_set_key $status $server_name;  # 开启vts详细状态码统计
-   
+
    server {
      server_name *.example.org;
-   
+
      listen 8080;
-   
+
      # vts访问路径
-     location /vts_status {  
+     location /vts_status {
        vhost_traffic_status_display;   # 开启vts展示
        vhost_traffic_status_display_format html;
      }
-   
+
      # stub_status访问路径
-     location /stub_status { 
+     location /stub_status {
        stub_status on;   # 开启stub_status模块
        access_log   off;
        allow 127.0.0.1;    # 只允许本地IP访问
@@ -90,10 +92,10 @@ Nginx Exporter通过解析 Nginx 的状态页面和其他可访问的信息源, 
 
    vts除了状态码统计, 还有基于地理信息的统计，根据访问量或访问流量对nginx做访问限制，详细使用见文档: https://github.com/vozlt/nginx-module-vts#installation
 
-4. 重新加载配置  
-  `sudo nginx -t && sudo nginx -s reload`  
+4. 重新加载配置
+  `sudo nginx -t && sudo nginx -s reload`
 
-5. 检查配置  
+5. 检查配置
    `
    nginx -t
 
@@ -102,7 +104,7 @@ Nginx Exporter通过解析 Nginx 的状态页面和其他可访问的信息源, 
    nginx: configuration file /opt/bitnami/nginx/conf/nginx.conf test is successful
   `
 
-6. 重启服务 
+6. 重启服务
   如果是改变 `Nginx` 的编译参数、添加新的模块, 通常需要重新编译和安装, 然后重启服务。
 
 ### 指标简介
